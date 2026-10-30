@@ -89,3 +89,9 @@ Profile photos, real certificates, résumé, project screenshots and original ar
 2. Set the Supabase Edge Function Secrets shown above, including ALLOWED_ORIGINS and TURNSTILE_HOSTNAMES. Complete the remaining private values without putting them into Git.
 3. Create and confirm the admin Auth user privately, then run authorize-nabin.sql and enroll TOTP.
 4. Configure the custom domain and deployment hook, install the Vault publishing trigger once, and verify live delivery/publishing.
+
+## Homepage entrance update
+
+The published settings now enable `entranceRequired`. On the first homepage visit in a tab, a disclosed Agree & Start flow appears before the katana animation. There is no Skip control for entry. Cancellation or failure keeps the homepage covered with a retry prompt. Only an accepted submission response opens the homepage and starts the animation; this records email-service acceptance, not inbox delivery. Privacy, admin, articles and the independent Lab remain reachable. This browser presentation flow does not protect downloadable public assets or verify identity.
+
+The submission backend was returning 503 because `IP_HASH_SECRET` was absent, too short or a placeholder. Set a private random value in Supabase Edge Function Secrets before testing delivery. Administrator membership for the confirmed owner account is now installed; the owner still enrolls and completes TOTP privately.

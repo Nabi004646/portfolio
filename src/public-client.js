@@ -4,12 +4,15 @@ import './intro.css';
 import './theme.css';
 import {applyPalette,readTheme,setTheme} from './theme.js';
 import {mountIntro} from './intro.js';
+import {mountEntrance} from './entrance.js';
 import {bindCertificates} from './certificates.js';
 import {esc,icon} from './utils.js';
 
 document.documentElement.classList.replace('no-js','js');
 const payload=JSON.parse(document.getElementById('public-page-data')?.textContent||'{}');
-const intro=mountIntro(payload.settings||{});
+let intro;
+const entrance=mountEntrance(payload.settings||{},{onAccepted:()=>{intro=mountIntro(payload.settings||{},{force:true});}});
+if(!entrance.required)intro=mountIntro(payload.settings||{});
 let motionPaused=localStorage.getItem('nabin-motion')==='paused';
 let theme=setTheme(readTheme());
 document.documentElement.classList.toggle('motion-paused',motionPaused);
@@ -41,4 +44,6 @@ if(location.pathname==='/blog/search/'){
   const input=document.getElementById('public-search');const term=(new URLSearchParams(location.search).get('q')||'').slice(0,100);input.value=term;
   if(term.trim())fetch('/search-index.json').then(response=>response.json()).then(posts=>{const matches=posts.filter(post=>`${post.title} ${post.excerpt} ${post.category}`.toLowerCase().includes(term.toLowerCase()));document.getElementById('search-status').textContent=`${matches.length} result${matches.length===1?'':'s'} for “${term}”.`;document.getElementById('search-results').innerHTML=matches.map(post=>`<article class="article-card"><a href="${esc(post.url)}"><span class="small-label">${esc(post.category)}</span><h2>${esc(post.title)}</h2><p>${esc(post.excerpt)}</p></a></article>`).join('');}).catch(()=>{document.getElementById('search-status').textContent='Search is temporarily unavailable. Browse the blog archive instead.';});
 }
-window.addEventListener('pagehide',()=>{observer.disconnect();closeCertificates();cancelAnimationFrame(frame);intro.destroy();});
+window.addEventListener('pagehide',()=>{observer.disconnect();closeCertificates();cancelAnimationFrame(frame);entrance.destroy();intro?.destroy();});
+
+window.addEventListener('pageshow',event=>{if(event.persisted&&entrance.required)location.reload();});

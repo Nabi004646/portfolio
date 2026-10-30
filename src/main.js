@@ -4,6 +4,7 @@ import './intro.css';
 import './theme.css';
 import {applyPalette,readTheme,setTheme} from './theme.js';
 import {mountIntro} from './intro.js';
+import {mountEntrance} from './entrance.js';
 import {createPublicViews} from './public-views.js';
 import { mediaUrl } from './local-media.js';
 import { certificateSection, bindCertificates } from './certificates.js';
@@ -164,5 +165,9 @@ window.addEventListener('beforeunload', () => { pageCleanup(); animationCleanup(
 
 try { items = await loadContent(); } catch { offline = true; }
 await render();
-const intro=mountIntro(s());
-window.addEventListener('pagehide',()=>intro.destroy(),{once:true});
+let intro;
+const entrance=mountEntrance(s(),{onAccepted:()=>{intro=mountIntro(s(),{force:true});}});
+if(!entrance.required)intro=mountIntro(s());
+window.addEventListener('pagehide',()=>{entrance.destroy();intro?.destroy();},{once:true});
+
+window.addEventListener('pageshow',event=>{if(event.persisted&&entrance.required)location.reload();});

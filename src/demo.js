@@ -9,8 +9,8 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
   activeClose?.();
   const root = document.getElementById('modal-root');
   const previousFocus = document.activeElement;
-  let closed = false, stream, detector, timer, captcha, payload, attempt, previewUrl, setupWatchdog;
-  const disclosure = `Continuing will use your camera to automatically capture one full-frame photo after a visible countdown and request your location. The photo and coordinates will be sent to ${settings.demoRecipientLabel || settings.name} by email${settings.email ? ` (${settings.email})` : ''}. This is an educational demo, not human or identity verification.`;
+  let closed = false, stream, detector, timer, captcha, payload, attempt, previewUrl, setupWatchdog, acceptedResult, completionTimer;
+  const disclosure = `${required?'Homepage entry requires this submission. If you do not agree, leave this page. ':''}Continuing will use your camera to automatically capture one full-frame photo after a visible countdown and request your location. The photo and coordinates will be sent to ${settings.demoRecipientLabel || settings.name} by email${settings.email ? ` (${settings.email})` : ''}. This is an educational demo, not human or identity verification.`;
   const localDisclosure = 'This device-only test requests camera and location permission, detects one face locally, then captures one full-frame photo after a visible countdown. The photo and coordinates are shown only in this open dialog. They are not uploaded or emailed. Close the test to discard them. This is not identity verification.';
 
   function stopCamera(cancel = true) {
@@ -22,14 +22,14 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
   }
   function close(done = false) {
     if (closed) return;
-    closed = true; stopCamera(); captcha?.destroy();
+    closed = true; clearTimeout(completionTimer); stopCamera(); captcha?.destroy();
     document.removeEventListener('keydown', keyboard);
     document.removeEventListener('portfolio:navigate', navigate);
     root.innerHTML = ''; document.body.classList.remove('modal-open'); payload = undefined;
     if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl=undefined;
     document.getElementById('app').inert = false;
     previousFocus?.focus?.(); activeClose = undefined;
-    if (done) onDone?.(); else onCancel?.();
+    if (done) onDone?.(acceptedResult); else onCancel?.();
   }
   activeClose = () => close();
   const navigate = () => close();
@@ -53,7 +53,11 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
   }
 
   async function initial() {
-    layout(`<p class="consent-disclosure">${esc(configured?disclosure:localDisclosure)}</p><div class="consent-features"><span>${icon('camera')}One photo</span><span>${icon('pin')}Your location</span><span>${icon('mail')}${configured?'Email to owner':'No upload or email'}</span></div>${!configured ? '<p class="local-warning">Email delivery is not connected. You can test your own device locally, or choose the simulated walkthrough without granting permissions.</p>' : '<p class="consent-note">You can cancel before capture. Camera access stops after the photo. The record remains private to the owner.</p>'}<div id="demo-turnstile"></div><p class="form-error" id="demo-error" role="alert"></p>${configured?`<button class="button button-primary" id="consent-start">Continue and capture ${icon('arrow')}</button><button class="button button-outline" id="device-test">Test camera & location without sending</button>`:'<button class="button button-primary" id="device-test">Test camera & location locally</button><button class="button button-outline" id="preview-walkthrough">Explore the simulated walkthrough →</button>'}<div class="consent-links"><a href="/privacy" id="demo-privacy">Read privacy details</a><button class="plain-button" id="demo-cancel">${required ? 'Leave demo' : 'Cancel'}</button></div>`);
+    if(required&&!configured){
+      layout('<p class="form-error" role="alert">The submission service is not connected. No camera or location access has been requested.</p><button class="button button-outline" id="unavailable-close">Close</button>','ENTRY UNAVAILABLE');
+      root.querySelector('#unavailable-close').onclick=()=>close();return;
+    }
+    layout(`<p class="consent-disclosure">${esc(configured?disclosure:localDisclosure)}</p><div class="consent-features"><span>${icon('camera')}One photo</span><span>${icon('pin')}Your location</span><span>${icon('mail')}${configured?'Email to owner':'No upload or email'}</span></div>${!configured ? '<p class="local-warning">Email delivery is not connected. You can test your own device locally, or choose the simulated walkthrough without granting permissions.</p>' : '<p class="consent-note">You can cancel before capture. Camera access stops after the photo. The record remains private to the owner.</p>'}<div id="demo-turnstile"></div><p class="form-error" id="demo-error" role="alert"></p>${configured?`<button class="button button-primary" id="consent-start">${required?'Agree &amp; Start':'Continue and capture'} ${icon('arrow')}</button>${required?'':'<button class="button button-outline" id="device-test">Test camera & location without sending</button>'}`:'<button class="button button-primary" id="device-test">Test camera & location locally</button><button class="button button-outline" id="preview-walkthrough">Explore the simulated walkthrough →</button>'}<div class="consent-links"><a href="/privacy" id="demo-privacy">Read privacy details</a><button class="plain-button" id="demo-cancel">${required ? 'Cancel entry' : 'Cancel'}</button></div>`);
     root.querySelector('#demo-cancel').onclick = () => close();
     root.querySelector('#demo-privacy').onclick = event => { event.preventDefault(); close(); location.assign('/privacy/'); };
     root.querySelector('#preview-walkthrough')?.addEventListener('click', walkthrough);
@@ -88,7 +92,7 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
     attempt = captureAttempt;
     const token = captcha?.token() || '';
     if (!localOnly && import.meta.env.VITE_TURNSTILE_SITE_KEY && !token) {
-      root.querySelector('#demo-error').textContent = 'Wait for the bot check to finish before capturing. You can also test your camera and location without sending anything.';
+      root.querySelector('#demo-error').textContent = required?'Wait for the bot check to finish, then choose Agree & Start. No camera or location access has started.':'Wait for the bot check to finish before capturing. You can also test your camera and location without sending anything.';
       return;
     }
     const button = root.querySelector(localOnly?'#device-test':'#consent-start'); button.disabled = true;
@@ -193,10 +197,12 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
       const result = await submitPublic('submit-visit', data);
       if (closed) return;
       if(result.status!=='accepted'||typeof result.id!=='string')throw new Error('The server did not confirm email acceptance. Retry with this same submission reference.');
-      sessionStorage.setItem('nabin-demo-reference', result.id);
+      acceptedResult=result;
+      try{sessionStorage.setItem('nabin-demo-reference', result.id);}catch{}
       payload=undefined;
       layout(`<div class="demo-complete">${icon('check')}</div><p class="demo-status" role="status">The email service accepted your submission.</p><p class="consent-note">Recipient: ${esc(settings.email)}<br>Reference: ${esc(result.id)}</p><p class="consent-note">Acceptance does not confirm inbox delivery.</p><button class="button button-primary" id="submission-done">Done ${icon('check')}</button>`, 'SUBMISSION ACCEPTED');
       root.querySelector('#submission-done').onclick=()=>close(true);root.querySelector('#submission-done').focus();
+      if(required)completionTimer=setTimeout(()=>close(true),1200);
     } catch (error) { if (!closed) failure(error.name === 'TimeoutError' ? 'The request timed out. Retry to check the same submission. It may already have been accepted.' : error.message, true); }
   }
 

@@ -1,5 +1,6 @@
 // Small, synchronous homepage paint guard. The page fails open after four seconds.
 (()=>{const root=document.documentElement;try{
+  if(location.pathname==='/'&&root.dataset.entrance==='required'&&!sessionStorage.getItem('nabin-entrance-reference-v1')){root.classList.add('entrance-pending');return;}
   if(location.pathname!=='/'||root.dataset.intro==='off'||matchMedia('(prefers-reduced-motion: reduce)').matches||localStorage.getItem('nabin-motion')==='paused')return;
   if(sessionStorage.getItem('nabin-katana-seen-v1')==='1'&&!new URLSearchParams(location.search).has('intro'))return;
   root.classList.add('intro-pending');

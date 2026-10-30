@@ -28,7 +28,7 @@ export const defaultContent = [
     footerLine: 'A little curiosity. A lot of care.', footerNote: 'Designed with intention. Built in Nepal.',
     metaDescription: 'Nabin Kunwar — web developer and cybersecurity student. Projects, experiments, and notes from Nepal.',
     cream: '#f5f3ee', blue: '#3156eb', coral: '#ff916c',
-    demoEnabled: true, demoRecipientLabel: 'Nabin Kunwar (portfolio owner)',
+    entranceRequired: false, demoEnabled: true, demoRecipientLabel: 'Nabin Kunwar (portfolio owner)',
     nav: [{ label: 'Home', href: '/' }, { label: 'About', href: '/about' }, { label: 'Projects', href: '/projects' }, { label: 'Certificates', href: '/certificates' }, { label: 'Blog', href: '/blog' }, { label: 'Contact', href: '/contact' }],
   } },
   { id: 'home', kind: 'home', title: 'Home', slug: '', is_published: true, sort_order: 1, data: {
