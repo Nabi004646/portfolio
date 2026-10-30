@@ -12,12 +12,12 @@ export const defaultContent = [
     github: 'https://github.com/Nabi004646',
     facebook: 'https://www.facebook.com/nabie.webdev',
     linkedin: 'https://www.linkedin.com/in/nabin-kunwar-332551356/',
-    instagram: 'https://www.instagram.com/nabin.webdev/',
+    github: 'https://github.com/Nabi004646',
     socialLinks: [
       { label: 'Facebook', icon: 'facebook', url: 'https://www.facebook.com/nabie.webdev' },
       { label: 'GitHub', icon: 'github', url: 'https://github.com/Nabi004646' },
       { label: 'LinkedIn', icon: 'linkedin', url: 'https://www.linkedin.com/in/nabin-kunwar-332551356/' },
-      { label: 'Instagram', icon: 'external', url: 'https://www.instagram.com/nabin.webdev/' },
+      { label: 'Github', icon: 'external', url: 'https://github.com/Nabi004646' },
     ],
     personalLinks: [
       { label: 'Facebook', handle: '@nabie.webdev', icon: 'facebook', url: 'https://www.facebook.com/nabie.webdev' },
