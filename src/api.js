@@ -125,7 +125,7 @@ export async function isAdminSession() {
 }
 
 let turnstileLoader;
-export async function mountTurnstile(container,{onChange=()=>{}}={}) {
+export async function mountTurnstile(container,{onChange=()=>{},onError}={}) {
   const sitekey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
   if (!sitekey) return { token: () => '', expiresAt:()=>0, reset: () => {}, destroy: () => {} };
   turnstileLoader ??= new Promise((resolve, reject) => {
@@ -137,6 +137,6 @@ export async function mountTurnstile(container,{onChange=()=>{}}={}) {
   if(!container?.isConnected)throw new Error('Bot check was closed.');
   const state=createBotToken();let destroyed=false;
   const change=value=>{if(destroyed)return;state.set(value);onChange(state.token());};
-  const id = window.turnstile.render(container, { sitekey, theme: 'auto', callback: change, 'expired-callback': () => change(''), 'error-callback': () => change('') });
+  const id = window.turnstile.render(container, { sitekey, theme: 'auto',retry:onError?'never':'auto', callback: change, 'expired-callback': () => change(''), 'error-callback': code => {change('');onError?.(code);return Boolean(onError);} });
   return { token:state.token,expiresAt:state.expiresAt,reset:()=>{state.clear();onChange('');window.turnstile.reset(id);},destroy:()=>{if(destroyed)return;destroyed=true;state.clear();window.turnstile.remove(id);} };
 }

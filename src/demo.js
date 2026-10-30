@@ -2,6 +2,7 @@ import { configured, mountTurnstile, submitPublic } from './api.js';
 import { uuid, esc, icon } from './utils.js';
 import { CONSENT_VERSION } from '../supabase/functions/_shared/validation.ts';
 import {usableBotToken} from './bot-token.js';
+import {botErrorMessage} from './bot-errors.js';
 
 export { CONSENT_VERSION };
 let activeClose;
@@ -66,8 +67,15 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
     root.querySelector('#device-test')?.addEventListener('click',()=>start(true));
     root.querySelector(!configured ? '#preview-walkthrough' : '#consent-start').focus();
     if (configured) {
-      try { captcha = await mountTurnstile(root.querySelector('#demo-turnstile')); if (closed) captcha?.destroy(); }
-      catch (error) { if (!closed) root.querySelector('#demo-error').textContent = error.message; }
+      const container=root.querySelector('#demo-turnstile'),error=root.querySelector('#demo-error'),startButton=root.querySelector('#consent-start');
+      const restart=document.createElement('button');restart.type='button';restart.className='button button-outline';restart.textContent='Restart verification';restart.hidden=true;error.after(restart);
+      const change=token=>{if(closed||!startButton.isConnected)return;startButton.disabled=Boolean(import.meta.env.VITE_TURNSTILE_SITE_KEY)&&!token;if(token){error.textContent='';restart.hidden=true;}};
+      const failed=code=>{if(closed||!error.isConnected)return;error.textContent=botErrorMessage(code);restart.hidden=false;startButton.disabled=true;};
+      change('');
+      let loading=false;
+      const load=async()=>{if(loading)return;loading=true;try{const value=await mountTurnstile(container,{onChange:change,onError:failed});if(closed||!container.isConnected)value.destroy();else{captcha=value;change(value.token());}}catch{if(!closed&&error.isConnected){error.textContent='Cloudflare verification could not load. Check your connection and restart verification.';restart.hidden=false;}}finally{loading=false;}};
+      restart.onclick=()=>{error.textContent='';restart.hidden=true;change('');if(captcha)captcha.reset();else load();};
+      await load();
     }
   }
 
@@ -227,7 +235,7 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
     } : async () => { captcha?.destroy(); captcha = undefined; await initial(); };
     root.querySelector('#cancel-retry').onclick = () => close();
     root.querySelector('#retry-demo').focus();
-    if (retrySend) mountTurnstile(root.querySelector('#retry-turnstile'),{onChange:token=>{if(!closed&&retry.isConnected)retry.disabled=!token;}}).then(value => { if (closed||!retry.isConnected)value.destroy();else{captcha=value;retry.disabled=!value.token();} }).catch(() => {if(!closed&&retry.isConnected)root.querySelector('.form-error').textContent='The bot check could not load. Check your connection, then close and reopen the entry prompt.';});
+    if (retrySend) mountTurnstile(root.querySelector('#retry-turnstile'),{onChange:token=>{if(!closed&&retry.isConnected)retry.disabled=!token;},onError:code=>{if(!closed&&retry.isConnected)root.querySelector('.form-error').textContent=botErrorMessage(code);}}).then(value => { if (closed||!retry.isConnected)value.destroy();else{captcha=value;retry.disabled=!value.token();} }).catch(() => {if(!closed&&retry.isConnected)root.querySelector('.form-error').textContent='The bot check could not load. Check your connection, then close and reopen the entry prompt.';});
   }
   initial();
   return () => close();
