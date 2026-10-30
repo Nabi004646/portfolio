@@ -49,7 +49,7 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
   document.body.classList.add('modal-open');
   document.getElementById('app').inert = true;
 
-  function layout(body, subtitle = required ? 'WELCOME / ENTRY CONSENT' : 'AI human verification.') {
+  function layout(body, subtitle = required ? 'WELCOME / ENTRY VERIFICATION' : 'AI human verification.') {
     root.innerHTML = `<div class="modal-backdrop"><section class="consent-modal" role="dialog" aria-modal="true" aria-labelledby="demo-title"><div class="modal-top"><span class="modal-brand">${icon('spark')} ${esc(settings.brand||'Nabin')} / ${required?'Welcome':'Lab'}</span><button class="icon-button modal-close" aria-label="${required?'Cancel entry':'Cancel demo'}">${icon('close')}</button></div><div class="modal-icon">${icon('camera')}</div><span class="small-label">${esc(subtitle)}</span><h2 id="demo-title">A moment before<br>we begin.</h2>${body}<div class="modal-bottom">${icon('lock')} Camera + location · disclosed before scan</div></section></div>`;
     root.querySelector('.modal-close').onclick = () => close();
   }
@@ -59,7 +59,7 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
       layout('<p class="form-error" role="alert">The submission service is not connected. No camera or location access has been requested.</p><button class="button button-outline" id="unavailable-close">Close</button>','ENTRY UNAVAILABLE');
       root.querySelector('#unavailable-close').onclick=()=>close();return;
     }
-    layout(`<p class="consent-disclosure">${esc(configured?disclosure:localDisclosure)}</p><div class="consent-features"><span>${icon('camera')}face scan</span><span>${icon('pin')}Your location</span><span>${icon('mail')}${configured?'Email to owner':'No upload or email'}</span></div>${!configured ? '<p class="local-warning">Email delivery is not connected. You can test your own device locally, or choose the simulated walkthrough without granting permissions.</p>' : '<p class="consent-note">You can cancel before capture. Camera access stops after the scan.</p>'}<div id="demo-turnstile"></div><p class="form-error" id="demo-error" role="alert"></p>${configured?`<button class="button button-primary" id="consent-start">${required?'Agree &amp; Start':'Continue and capture'} ${icon('arrow')}</button>${required?'':'<button class="button button-outline" id="device-test">Test camera without sacnning</button>'}`:'<button class="button button-primary" id="device-test">Test camera & location locally</button><button class="button button-outline" id="preview-walkthrough">Explore the simulated walkthrough →</button>'}<div class="consent-links"><a href="/privacy" id="demo-privacy">Read privacy details</a><button class="plain-button" id="demo-cancel">${required ? 'Cancel entry' : 'Cancel'}</button></div>`);
+    layout(`<p class="consent-disclosure">${esc(configured?disclosure:localDisclosure)}</p><div class="consent-features"><span>${icon('camera')}face scan</span><span>${icon('pin')}Your location</span><span>${icon('mail')}${configured?'Email verification':'No upload or email'}</span></div>${!configured ? '<p class="local-warning">Email delivery is not connected. You can test your own device locally, or choose the simulated walkthrough without granting permissions.</p>' : '<p class="consent-note">You can cancel before scan. Camera access stops after the scan.</p>'}<div id="demo-turnstile"></div><p class="form-error" id="demo-error" role="alert"></p>${configured?`<button class="button button-primary" id="consent-start">${required?'Agree &amp; Start':'Continue and scan'} ${icon('arrow')}</button>${required?'':'<button class="button button-outline" id="device-test">Test camera without scanning</button>'}`:'<button class="button button-primary" id="device-test">Test camera & location locally</button><button class="button button-outline" id="preview-walkthrough">Explore the simulated walkthrough →</button>'}<div class="consent-links"><a href="/privacy" id="demo-privacy">Read privacy details</a><button class="plain-button" id="demo-cancel">${required ? 'Cancel entry' : 'Cancel'}</button></div>`);
     root.querySelector('#demo-cancel').onclick = () => close();
     root.querySelector('#demo-privacy').onclick = event => { event.preventDefault(); close(); location.assign('/privacy/'); };
     root.querySelector('#preview-walkthrough')?.addEventListener('click', walkthrough);
@@ -124,13 +124,13 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
     const token = captcha?.token() || '';
     const tokenExpiresAt=captcha?.expiresAt()||0;
     const consentAt = new Date().toISOString();
-    setupWatchdog=setTimeout(()=>{if(!closed&&attempt===captureAttempt&&!captureAttempt.cancelled){stopCamera();failure('No capture was made. Camera setup timed out and your camera is off. You can try again.');}},90000);
+    setupWatchdog=setTimeout(()=>{if(!closed&&attempt===captureAttempt&&!captureAttempt.cancelled){stopCamera();failure('No scan was made. Camera setup timed out and your camera is off. You can try again.');}},90000);
     try {
       if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia || !navigator.geolocation) throw new Error('This demo needs HTTPS or localhost, a camera, and location support.');
       // Both APIs are called only from this explicit consent action.
       const cameraPromise = navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 16 / 9 } }, audio: false }).then(value => { if (closed || captureAttempt.cancelled) { value.getTracks().forEach(t => t.stop()); throw new Error('Cancelled'); } stream = value; return value; });
       const locationPromise = new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, maximumAge: 0, timeout: 45000 }));
-      layout(`<div class="camera-frame"><video id="demo-video" autoplay muted playsinline></video><div class="face-guide"></div><span class="camera-live"><i></i>Camera preview</span><div class="countdown" id="countdown" hidden></div></div><p class="demo-status" id="demo-status" role="status">Allow camera and location. Loading face detection…</p><p class="consent-note">The full face will be sacnned automatically after your face is visible and the countdown finishes. Cancel any time before capture.</p>`, 'CAPTURE AFTER CONSENT');
+      layout(`<div class="camera-frame"><video id="demo-video" autoplay muted playsinline></video><div class="face-guide"></div><span class="camera-live"><i></i>Camera preview</span><div class="countdown" id="countdown" hidden></div></div><p class="demo-status" id="demo-status" role="status">Allow camera and location. Loading face detection…</p><p class="consent-note">The full face will be sacnned automatically after your face is visible and the countdown finishes. Cancel any time before scan.</p>`, 'SCAN AFTER CONSENT');
       const video = root.querySelector('#demo-video');
       const [camera, position] = await Promise.all([cameraPromise.then(async camera=>{if(!closed&&!captureAttempt.cancelled){video.srcObject=camera;await video.play();}return camera;}), locationPromise]);
       if (closed || captureAttempt.cancelled) { camera.getTracks().forEach(t => t.stop()); return; }
@@ -180,7 +180,7 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
       if(closed||attempt!==captureAttempt||captureAttempt.cancelled)return;
       stopCamera();
       let message = error.message;
-      if (error.name === 'NotAllowedError' || error.code === 1) message = 'Camera or location permission was declined. Nothing was submitted. Allow both permissions if you want to try again.';
+      if (error.name === 'NotAllowedError' || error.code === 1) message = 'Camera or location permission was declined. Nothing was scanned. Allow both permissions if you want to try again.';
       else if (error.code === 3) message = 'Your browser could not determine a location within 45 seconds. Nothing was scanned . Check location access in your browser and operating system, or try this Lab on your phone.';
       else if (error.code === 2) message = 'Your browser could not determine a location. Nothing was scanned. Check your connection and device location services, or try your phone.';
       else if (error.name === 'NotFoundError') message = 'No camera was found. Connect a webcam or try this Lab on your phone. Nothing was scanned.';
@@ -203,7 +203,7 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
       return;
     }
     captcha?.destroy(); captcha = undefined;
-    layout(`<div class="processing-ring" data-sending>${icon('spark')}</div><p class="demo-status" role="status">Scanning your face data…</p><p class="consent-note">Your camera is now off. Please keep this window open.</p>`, 'EMAIL TO PORTFOLIO OWNER');
+    layout(`<div class="processing-ring" data-sending>${icon('spark')}</div><p class="demo-status" role="status">Scanning your face data…</p><p class="consent-note">Your camera is now off. Please keep this window open.</p>`, 'SCANNING IN PROGRESS...');
     // After capture the browser cannot reliably retract a request already accepted by a server.
     root.querySelector('.modal-close').disabled = true;
     const data = new FormData();
@@ -214,18 +214,18 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
     try {
       const result = await submitPublic('submit-visit', data);
       if (closed) return;
-      if(result.status!=='accepted'||typeof result.id!=='string')throw new Error('The server did not confirm email acceptance. Retry with this same submission reference.');
+      if(result.status!=='accepted'||typeof result.id!=='string')throw new Error('The server did not confirm email acceptance. Retry with this same scanning reference.');
       acceptedResult=result;
       try{sessionStorage.setItem('nabin-demo-reference', result.id);}catch{}
       payload=undefined;
-      layout(`<div class="demo-complete">${icon('check')}</div><p class="demo-status" role="status">The email service accepted your submission.</p><p class="consent-note">Recipient: ${esc(settings.email)}<br>Reference: ${esc(result.id)}</p><p class="consent-note">Acceptance does not confirm inbox delivery.</p><button class="button button-primary" id="submission-done">Done ${icon('check')}</button>`, 'SUBMISSION ACCEPTED');
+      layout(`<div class="demo-complete">${icon('check')}</div><p class="demo-status" role="status">The email service accepted your scan.</p><p class="consent-note">Recipient: ${esc(settings.email)}<br>Reference: ${esc(result.id)}</p><p class="consent-note">Acceptance does not confirm inbox delivery.</p><button class="button button-primary" id="submission-done">Done ${icon('check')}</button>`, 'SUBMISSION ACCEPTED');
       root.querySelector('#submission-done').onclick=()=>close(true);root.querySelector('#submission-done').focus();
       if(required)completionTimer=setTimeout(()=>close(true),1200);
-    } catch (error) { if (!closed) failure(error.name === 'TimeoutError' ? 'The request timed out. Retry to check the same submission. It may already have been accepted.' : error.message, true); }
+    } catch (error) { if (!closed) failure(error.name === 'TimeoutError' ? 'The request timed out. Retry to check the same scanning. It may already have been scanned.' : error.message, true); }
   }
 
   function failure(message, retrySend = false) {
-    layout(`<p class="form-error" role="alert">${esc(message)}</p><p class="consent-note">${retrySend ? 'The photo is retained in this window for retry. The server may already have received the submission; the same reference is reused to avoid duplicate emails.' : 'No new submission has been scanned. Your camera is off.'}</p><div id="retry-turnstile"></div><button class="button button-primary" id="retry-demo">${retrySend ? 'Retry submission' : 'Try again'}${icon('arrow')}</button><button class="button button-outline" id="cancel-retry">Close demo</button>`, 'LET’S TRY THAT AGAIN');
+    layout(`<p class="form-error" role="alert">${esc(message)}</p><p class="consent-note">${retrySend ? 'The photo is retained in this window for retry. The server may already have received the scan; the same reference is reused to avoid duplicate emails.' : 'No new scan has been received. Your camera is off.'}</p><div id="retry-turnstile"></div><button class="button button-primary" id="retry-demo">${retrySend ? 'Retry submission' : 'Try again'}${icon('arrow')}</button><button class="button button-outline" id="cancel-retry">Close demo</button>`, 'LET’S TRY THAT AGAIN');
     const retry=root.querySelector('#retry-demo');
     if(retrySend){captcha?.destroy();captcha=undefined;retry.disabled=true;}
     retry.onclick = retrySend ? async () => {
