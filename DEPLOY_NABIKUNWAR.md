@@ -39,10 +39,12 @@ Configure the Turnstile widget to allow `nabikunwar.com.np` and `portfolio-17x.p
 
 ## 4. GitHub and Cloudflare Pages
 
-Repository: `https://github.com/Nabi004646/portfolio`. The connected GitHub app now includes portfolio and the default branch is main. Source files belong at the repository root. The public production settings can be committed; private credentials stay outside Git.
+Repository: `https://github.com/Nabi004646/portfolio`. The connected GitHub app now includes portfolio and the default branch is main. The complete source is uploaded on main, with files at the repository root. The public production settings can be committed; private credentials stay outside Git.
 
 
-Use a Git-connected Pages project for automatic blog rebuilds:
+Use a Git-connected Pages project for automatic blog rebuilds. If the existing project was created with Direct Upload, Cloudflare requires a new Git-connected project; do not delete the existing project while setting this up. Move the custom domain only after verifying the new deployment. If the new Pages hostname differs, update ALLOWED_ORIGINS and TURNSTILE_HOSTNAMES accordingly.
+
+Build settings:
 
 | Pages setting | Value |
 | --- | --- |

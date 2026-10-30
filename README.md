@@ -13,4 +13,4 @@ The public production configuration is in `.env.production`. Private credentials
 
 See [DEPLOY_NABIKUNWAR.md](DEPLOY_NABIKUNWAR.md) for account setup and [VERIFICATION.md](VERIFICATION.md) for actual checks and outstanding live tests. [START_HERE.md](START_HERE.md) explains the source, and [SEO_DEPLOYMENT.md](SEO_DEPLOYMENT.md) covers publishing, redirects and sitemap generation.
 
-The Supabase database schema and three Edge Functions were deployed on 30 October 2026. GitHub/Cloudflare deployment and the remaining private account settings must be verified separately; function deployment alone is not proof of email delivery or a live custom domain. Starter articles remain drafts, and real certificate images come from the owner.
+The Supabase database schema and three Edge Functions were deployed on 30 October 2026. The full source is now uploaded to this GitHub repository on main. Cloudflare deployment and the remaining private account settings still need completion; function deployment alone is not proof of email delivery or a live custom domain. Starter articles remain drafts, and real certificate images come from the owner.
