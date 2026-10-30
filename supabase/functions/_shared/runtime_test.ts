@@ -59,3 +59,14 @@ Deno.test('base64 handles attachment-sized buffers without overflowing a call st
   const bytes = new Uint8Array(1024 * 1024).fill(123);
   assert(atob(toBase64(bytes)).length === bytes.length);
 });
+Deno.test('missing or invalid Turnstile configuration is distinct from an unfinished visitor challenge',async()=>{
+  setup();Deno.env.set('REQUIRE_TURNSTILE','true');Deno.env.set('TURNSTILE_HOSTNAMES','portfolio.example');
+  const form=new FormData();let calls=0;
+  const status=async()=>{try{await checkTurnstile(form);return 200;}catch(e){return (e as {status:number}).status;}};
+  globalThis.fetch=async()=>{calls++;return new Response(JSON.stringify({success:false,'error-codes':['invalid-input-secret']}));};
+  try{
+    Deno.env.delete('TURNSTILE_SECRET_KEY');assert(await status()===503);assert(calls===0);
+    Deno.env.set('TURNSTILE_SECRET_KEY','mock-secret');assert(await status()===400);assert(calls===0);
+    form.set('turnstileToken','synthetic-token');assert(await status()===503);assert(Number(calls)===1);
+  }finally{globalThis.fetch=originalFetch;}
+});

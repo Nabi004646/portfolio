@@ -46,10 +46,13 @@ export async function checkTurnstile(form: FormData) {
   if (env('REQUIRE_TURNSTILE', 'true') !== 'true') return;
   const secret = env('TURNSTILE_SECRET_KEY');
   const token = form.get('turnstileToken');
-  if (!secret || typeof token !== 'string' || !token || token.length > 2048) throw new HttpError(400, 'Complete the bot check and try again.');
+  if (!secret || /^(REPLACE_|YOUR_)/i.test(secret)) throw new HttpError(503, 'Bot protection is not configured: the owner must set TURNSTILE_SECRET_KEY in Supabase Edge Function Secrets.');
+  const hosts = env('TURNSTILE_HOSTNAMES').split(',').map(x => x.trim()).filter(Boolean);
+  if(!hosts.length)throw new HttpError(503,'Bot protection is not configured: the owner must set TURNSTILE_HOSTNAMES.');
+  if (typeof token !== 'string' || !token || token.length > 2048) throw new HttpError(400, 'Complete the bot check and try again.');
   const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ secret, response: token }), signal: AbortSignal.timeout(10000) });
   const result = await response.json();
-  const hosts = env('TURNSTILE_HOSTNAMES').split(',').map(x => x.trim()).filter(Boolean);
+  if((result['error-codes']||[]).some((code:string)=>['invalid-input-secret','missing-input-secret'].includes(code)))throw new HttpError(503,'Bot protection configuration failed. The owner must save the secret matching this Turnstile widget in Supabase.');
   if (!response.ok || !result.success || !hosts.length || !hosts.includes(result.hostname)) throw new HttpError(400, 'The bot check expired or did not verify. Please try again.');
 }
 export function toBase64(bytes: Uint8Array) {

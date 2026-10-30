@@ -1,6 +1,7 @@
 import { configured, mountTurnstile, submitPublic } from './api.js';
 import { uuid, esc, icon } from './utils.js';
 import { CONSENT_VERSION } from '../supabase/functions/_shared/validation.ts';
+import {usableBotToken} from './bot-token.js';
 
 export { CONSENT_VERSION };
 let activeClose;
@@ -113,6 +114,7 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
     if (captureAttempt.started || captureAttempt.cancelled) return;
     captureAttempt.started = true;
     const token = captcha?.token() || '';
+    const tokenExpiresAt=captcha?.expiresAt()||0;
     const consentAt = new Date().toISOString();
     setupWatchdog=setTimeout(()=>{if(!closed&&attempt===captureAttempt&&!captureAttempt.cancelled){stopCamera();failure('No capture was made. Camera setup timed out and your camera is off. You can try again.');}},90000);
     try {
@@ -160,8 +162,10 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
           if(closed||captureAttempt.cancelled||attempt!==captureAttempt)return;
           stopCamera(false);
           if (!blob) throw new Error('The camera frame could not be captured.');
-          payload = { blob, latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy, consentAt, consentText: localOnly?localDisclosure:disclosure, token, requestId: uuid(), localOnly };
-          if(localOnly)showDeviceResult();else await send();
+          payload = { blob, latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy, consentAt, consentText: localOnly?localDisclosure:disclosure, token, tokenExpiresAt, requestId: uuid(), localOnly };
+          if(localOnly)showDeviceResult();
+          else if(import.meta.env.VITE_TURNSTILE_SITE_KEY&&!usableBotToken(token,tokenExpiresAt))failure('Complete a fresh bot check to send the captured photo. Your camera is off.',true);
+          else await send();
         } catch (error) { if(closed||attempt!==captureAttempt)return;stopCamera();failure(error.message); }
       }, 200);
     } catch (error) {
@@ -186,6 +190,10 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
 
   async function send() {
     if (closed || !payload || payload.localOnly) return;
+    if(import.meta.env.VITE_TURNSTILE_SITE_KEY&&!usableBotToken(payload.token,payload.tokenExpiresAt)){
+      const error=root.querySelector('.form-error');if(error)error.textContent='Wait for Cloudflare verification to finish before retrying. Your camera is off.';
+      return;
+    }
     captcha?.destroy(); captcha = undefined;
     layout(`<div class="processing-ring" data-sending>${icon('spark')}</div><p class="demo-status" role="status">Sending your photo and location…</p><p class="consent-note">Your camera is now off. Please keep this window open.</p>`, 'EMAIL TO PORTFOLIO OWNER');
     // After capture the browser cannot reliably retract a request already accepted by a server.
@@ -193,6 +201,8 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
     const data = new FormData();
     data.set('photo', payload.blob, 'capture.jpg'); data.set('latitude', String(payload.latitude)); data.set('longitude', String(payload.longitude)); data.set('accuracy', String(payload.accuracy));
     data.set('consent', 'true'); data.set('consentVersion', CONSENT_VERSION); data.set('consentAt', payload.consentAt); data.set('consentText', payload.consentText); data.set('requestId', payload.requestId); data.set('turnstileToken', payload.token);
+    // The server may consume the token even if its response is lost.
+    payload.token='';payload.tokenExpiresAt=0;
     try {
       const result = await submitPublic('submit-visit', data);
       if (closed) return;
@@ -208,10 +218,16 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
 
   function failure(message, retrySend = false) {
     layout(`<p class="form-error" role="alert">${esc(message)}</p><p class="consent-note">${retrySend ? 'The photo is retained in this window for retry. The server may already have received the submission; the same reference is reused to avoid duplicate emails.' : 'No new submission has been sent. Your camera is off.'}</p><div id="retry-turnstile"></div><button class="button button-primary" id="retry-demo">${retrySend ? 'Retry submission' : 'Try again'}${icon('arrow')}</button><button class="button button-outline" id="cancel-retry">Close demo</button>`, 'LET’S TRY THAT AGAIN');
-    root.querySelector('#retry-demo').onclick = retrySend ? async () => { if (captcha) payload.token = captcha.token(); await send(); } : async () => { captcha?.destroy(); captcha = undefined; await initial(); };
+    const retry=root.querySelector('#retry-demo');
+    if(retrySend){captcha?.destroy();captcha=undefined;retry.disabled=true;}
+    retry.onclick = retrySend ? async () => {
+      const token=captcha?.token()||'',expiresAt=captcha?.expiresAt()||0;
+      if(!usableBotToken(token,expiresAt)){retry.disabled=true;return;}
+      payload.token=token;payload.tokenExpiresAt=expiresAt;await send();
+    } : async () => { captcha?.destroy(); captcha = undefined; await initial(); };
     root.querySelector('#cancel-retry').onclick = () => close();
     root.querySelector('#retry-demo').focus();
-    if (retrySend) mountTurnstile(root.querySelector('#retry-turnstile')).then(value => { if (closed) value.destroy(); else captcha = value; }).catch(() => {});
+    if (retrySend) mountTurnstile(root.querySelector('#retry-turnstile'),{onChange:token=>{if(!closed&&retry.isConnected)retry.disabled=!token;}}).then(value => { if (closed||!retry.isConnected)value.destroy();else{captcha=value;retry.disabled=!value.token();} }).catch(() => {if(!closed&&retry.isConnected)root.querySelector('.form-error').textContent='The bot check could not load. Check your connection, then close and reopen the entry prompt.';});
   }
   initial();
   return () => close();

@@ -1,4 +1,5 @@
 import { uuid } from './utils.js';
+import {createBotToken} from './bot-token.js';
 import { createClient } from '@supabase/supabase-js';
 import { defaultContent } from './content.js';
 import { extendedContent, mergeEditorFields } from './extended-content.js';
@@ -124,16 +125,18 @@ export async function isAdminSession() {
 }
 
 let turnstileLoader;
-export async function mountTurnstile(container) {
+export async function mountTurnstile(container,{onChange=()=>{}}={}) {
   const sitekey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
-  if (!sitekey) return { token: () => '', reset: () => {}, destroy: () => {} };
+  if (!sitekey) return { token: () => '', expiresAt:()=>0, reset: () => {}, destroy: () => {} };
   turnstileLoader ??= new Promise((resolve, reject) => {
     if (window.turnstile) return resolve();
     const script = document.createElement('script'); script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'; script.async = true;
     script.onload = resolve; script.onerror = () => reject(new Error('Bot check could not load. Please retry.')); document.head.append(script);
   });
-  await turnstileLoader;
-  let token = '';
-  const id = window.turnstile.render(container, { sitekey, theme: 'auto', callback: value => { token = value; }, 'expired-callback': () => { token = ''; }, 'error-callback': () => { token = ''; } });
-  return { token: () => token, reset: () => { token = ''; window.turnstile.reset(id); }, destroy: () => window.turnstile.remove(id) };
+  try{await turnstileLoader;}catch(error){turnstileLoader=undefined;throw error;}
+  if(!container?.isConnected)throw new Error('Bot check was closed.');
+  const state=createBotToken();let destroyed=false;
+  const change=value=>{if(destroyed)return;state.set(value);onChange(state.token());};
+  const id = window.turnstile.render(container, { sitekey, theme: 'auto', callback: change, 'expired-callback': () => change(''), 'error-callback': () => change('') });
+  return { token:state.token,expiresAt:state.expiresAt,reset:()=>{state.clear();onChange('');window.turnstile.reset(id);},destroy:()=>{if(destroyed)return;destroyed=true;state.clear();window.turnstile.remove(id);} };
 }
