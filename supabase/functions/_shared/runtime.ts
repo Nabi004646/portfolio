@@ -47,8 +47,13 @@ export async function checkTurnstile(form: FormData) {
   const secret = env('TURNSTILE_SECRET_KEY');
   const token = form.get('turnstileToken');
   if (!secret || /^(REPLACE_|YOUR_)/i.test(secret)) throw new HttpError(503, 'Bot protection is not configured: the owner must set TURNSTILE_SECRET_KEY in Supabase Edge Function Secrets.');
-  const hosts = env('TURNSTILE_HOSTNAMES').split(',').map(x => x.trim()).filter(Boolean);
-  if(!hosts.length)throw new HttpError(503,'Bot protection is not configured: the owner must set TURNSTILE_HOSTNAMES.');
+  const configuredHosts = env('TURNSTILE_HOSTNAMES').split(',').map(x => x.trim()).filter(Boolean);
+  // An explicit hostname list overrides the existing website-origin allowlist.
+  // Derive exact HTTPS hosts when that duplicate setting was left empty.
+  const hosts = configuredHosts.length ? configuredHosts : env('ALLOWED_ORIGINS').split(',').flatMap(value=>{
+    const origin=value.trim();try{const parsed=new URL(origin);return parsed.protocol==='https:'&&parsed.origin===origin?[parsed.hostname]:[];}catch{return [];}
+  });
+  if(!hosts.length)throw new HttpError(503,'Bot protection has no configured website domains. Contact the portfolio owner.');
   if (typeof token !== 'string' || !token || token.length > 2048) throw new HttpError(400, 'Complete the bot check and try again.');
   const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ secret, response: token }), signal: AbortSignal.timeout(10000) });
   const result = await response.json();

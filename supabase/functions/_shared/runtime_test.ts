@@ -70,3 +70,14 @@ Deno.test('missing or invalid Turnstile configuration is distinct from an unfini
     form.set('turnstileToken','synthetic-token');assert(await status()===503);assert(Number(calls)===1);
   }finally{globalThis.fetch=originalFetch;}
 });
+Deno.test('unset Turnstile hostnames derive only exact HTTPS origins and explicit overrides remain restrictive',async()=>{
+  setup();Deno.env.set('REQUIRE_TURNSTILE','true');Deno.env.set('TURNSTILE_SECRET_KEY','mock-secret');Deno.env.delete('TURNSTILE_HOSTNAMES');
+  Deno.env.set('ALLOWED_ORIGINS','https://portfolio.example, https://preview.example,https://bad.example/path,not-a-url,http://plain.example');
+  const form=new FormData();form.set('turnstileToken','synthetic-token');
+  const accepts=async(hostname:string)=>{globalThis.fetch=async()=>new Response(JSON.stringify({success:true,hostname}));try{await checkTurnstile(form);return true;}catch{return false;}};
+  try{
+    assert(await accepts('portfolio.example'));assert(await accepts('preview.example'));
+    for(const host of ['evil.example','bad.example','plain.example'])assert(!await accepts(host));
+    Deno.env.set('TURNSTILE_HOSTNAMES','explicit.example');assert(!await accepts('portfolio.example'));assert(await accepts('explicit.example'));
+  }finally{globalThis.fetch=originalFetch;}
+});

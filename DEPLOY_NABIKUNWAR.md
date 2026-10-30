@@ -31,6 +31,8 @@ Known public values:
 | `ALLOWED_ORIGINS` | `https://nabikunwar.com.np,https://portfolio-17x.pages.dev` |
 | `TURNSTILE_HOSTNAMES` | `nabikunwar.com.np,portfolio-17x.pages.dev` |
 
+`TURNSTILE_HOSTNAMES` can be an explicit comma-separated hostname override. When empty, the backend derives exact HTTPS hostnames from `ALLOWED_ORIGINS`; malformed origins and URLs containing paths are excluded. Server-side token verification remains required.
+
 Required private values: `RESEND_API_KEY`, replacement `TURNSTILE_SECRET_KEY`, random `IP_HASH_SECRET`, Pages `CLOUDFLARE_DEPLOY_HOOK`, and separate random `PUBLISH_WEBHOOK_SECRET`. Generate the two random secrets independently with `openssl rand -hex 32` on your own machine. The hosted Supabase runtime supplies its service-role credentials; do not put them in the frontend.
 
 Deploy `submit-contact`, `submit-visit` and `request-publish`, including their `_shared/` dependencies, using `supabase/config.toml`. These handlers perform their own origin, consent, bot/rate, or signed-admin checks; the entries intentionally use `verify_jwt=false`. Use the connected Supabase deployment tools or consult CLI `--help` before using its deployment commands.
