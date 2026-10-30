@@ -53,7 +53,7 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
   }
 
   async function initial() {
-    layout(`<p class="consent-disclosure">${esc(configured?disclosure:localDisclosure)}</p><div class="consent-features"><span>${icon('camera')}One photo</span><span>${icon('pin')}Your location</span><span>${icon('mail')}${configured?'Email to owner':'No upload or email'}</span></div>${!configured ? '<p class="local-warning">Email delivery is not connected. You can test your own device locally, or choose the simulated walkthrough without granting permissions.</p>' : '<p class="consent-note">You can cancel before capture. Camera access stops after the photo. The record remains private to the owner.</p>'}<div id="demo-turnstile"></div><p class="form-error" id="demo-error" role="alert"></p>${configured?`<button class="button button-primary" id="consent-start">Continue and capture ${icon('arrow')}</button>`:'<button class="button button-primary" id="device-test">Test camera & location locally</button><button class="button button-outline" id="preview-walkthrough">Explore the simulated walkthrough →</button>'}<div class="consent-links"><a href="/privacy" id="demo-privacy">Read privacy details</a><button class="plain-button" id="demo-cancel">${required ? 'Leave demo' : 'Cancel'}</button></div>`);
+    layout(`<p class="consent-disclosure">${esc(configured?disclosure:localDisclosure)}</p><div class="consent-features"><span>${icon('camera')}One photo</span><span>${icon('pin')}Your location</span><span>${icon('mail')}${configured?'Email to owner':'No upload or email'}</span></div>${!configured ? '<p class="local-warning">Email delivery is not connected. You can test your own device locally, or choose the simulated walkthrough without granting permissions.</p>' : '<p class="consent-note">You can cancel before capture. Camera access stops after the photo. The record remains private to the owner.</p>'}<div id="demo-turnstile"></div><p class="form-error" id="demo-error" role="alert"></p>${configured?`<button class="button button-primary" id="consent-start">Continue and capture ${icon('arrow')}</button><button class="button button-outline" id="device-test">Test camera & location without sending</button>`:'<button class="button button-primary" id="device-test">Test camera & location locally</button><button class="button button-outline" id="preview-walkthrough">Explore the simulated walkthrough →</button>'}<div class="consent-links"><a href="/privacy" id="demo-privacy">Read privacy details</a><button class="plain-button" id="demo-cancel">${required ? 'Leave demo' : 'Cancel'}</button></div>`);
     root.querySelector('#demo-cancel').onclick = () => close();
     root.querySelector('#demo-privacy').onclick = event => { event.preventDefault(); close(); location.assign('/privacy/'); };
     root.querySelector('#preview-walkthrough')?.addEventListener('click', walkthrough);
@@ -87,14 +87,35 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
     const captureAttempt = { cancelled: false };
     attempt = captureAttempt;
     const token = captcha?.token() || '';
-    const consentAt = new Date().toISOString();
+    if (!localOnly && import.meta.env.VITE_TURNSTILE_SITE_KEY && !token) {
+      root.querySelector('#demo-error').textContent = 'Wait for the bot check to finish before capturing. You can also test your camera and location without sending anything.';
+      return;
+    }
     const button = root.querySelector(localOnly?'#device-test':'#consent-start'); button.disabled = true;
+    try {
+      if (localOnly) {
+        layout(`<p class="consent-disclosure">${esc(localDisclosure)}</p><button class="button button-primary" id="confirm-device-test">Start device-only test ${icon('camera')}</button><button class="button button-outline" id="cancel-device-test">Cancel</button>`, 'NO UPLOAD OR EMAIL');
+        root.querySelector('#confirm-device-test').onclick = () => capture(true);
+        root.querySelector('#cancel-device-test').onclick = () => close();
+        return;
+      }
+      await capture(false);
+    } catch (error) { stopCamera(); failure(error.message || 'The demo could not start.'); }
+  }
+
+  async function capture(localOnly) {
+    if (closed) return;
+    const captureAttempt = attempt;
+    if (captureAttempt.started || captureAttempt.cancelled) return;
+    captureAttempt.started = true;
+    const token = captcha?.token() || '';
+    const consentAt = new Date().toISOString();
     setupWatchdog=setTimeout(()=>{if(!closed&&attempt===captureAttempt&&!captureAttempt.cancelled){stopCamera();failure('No capture was made. Camera setup timed out and your camera is off. You can try again.');}},90000);
     try {
       if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia || !navigator.geolocation) throw new Error('This demo needs HTTPS or localhost, a camera, and location support.');
       // Both APIs are called only from this explicit consent action.
       const cameraPromise = navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 16 / 9 } }, audio: false }).then(value => { if (closed || captureAttempt.cancelled) { value.getTracks().forEach(t => t.stop()); throw new Error('Cancelled'); } stream = value; return value; });
-      const locationPromise = new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }));
+      const locationPromise = new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, maximumAge: 0, timeout: 45000 }));
       layout(`<div class="camera-frame"><video id="demo-video" autoplay muted playsinline></video><div class="face-guide"></div><span class="camera-live"><i></i>Camera preview</span><div class="countdown" id="countdown" hidden></div></div><p class="demo-status" id="demo-status" role="status">Allow camera and location. Loading face detection…</p><p class="consent-note">The full frame will be captured automatically after your face is visible and the countdown finishes. Cancel any time before capture.</p>`, 'CAPTURE AFTER CONSENT');
       const video = root.querySelector('#demo-video');
       const [camera, position] = await Promise.all([cameraPromise.then(async camera=>{if(!closed&&!captureAttempt.cancelled){video.srcObject=camera;await video.play();}return camera;}), locationPromise]);
@@ -106,6 +127,7 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
       const createdDetector = await FaceDetector.createFromOptions(vision, { baseOptions: { modelAssetPath: '/vision/blaze_face_short_range.tflite', delegate: 'CPU' }, runningMode: 'VIDEO', minDetectionConfidence: 0.65 });
       if (closed || captureAttempt.cancelled) { createdDetector.close(); return; }
       detector = createdDetector;
+      clearTimeout(setupWatchdog); setupWatchdog = undefined;
       let stableFrames = 0, countdownStart = 0, lastVideoTime = -1;
       const status = root.querySelector('#demo-status'); const count = root.querySelector('#countdown');
       status.textContent = 'Center one face in the frame. A 3-second countdown starts when you’re ready.';
@@ -143,7 +165,10 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
       stopCamera();
       let message = error.message;
       if (error.name === 'NotAllowedError' || error.code === 1) message = 'Camera or location permission was declined. Nothing was submitted. Allow both permissions if you want to try again.';
-      else if (error.code === 3) message = 'Location could not be determined in time. Nothing was submitted. Try again where your device can get a location.';
+      else if (error.code === 3) message = 'Your browser could not determine a location within 45 seconds. Nothing was submitted. Check location access in your browser and operating system, or try this Lab on your phone.';
+      else if (error.code === 2) message = 'Your browser could not determine a location. Nothing was submitted. Check your connection and device location services, or try your phone.';
+      else if (error.name === 'NotFoundError') message = 'No camera was found. Connect a webcam or try this Lab on your phone. Nothing was submitted.';
+      else if (error.name === 'NotReadableError') message = 'The camera could not be opened. Close other apps using it and try again. Nothing was submitted.';
       failure(message || 'The demo could not start. Nothing was submitted.');
     }
   }

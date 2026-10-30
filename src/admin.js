@@ -47,7 +47,7 @@ export async function mountAdmin(root, ctx) {
   function login(message = '') {
     if (disposed) return;
     document.querySelector('.skip-link')?.setAttribute('href','#main');
-    root.innerHTML = `<main id="main" tabindex="-1" class="admin-auth"><a href="/" data-link class="brand">${esc(owner().brand || 'Nabin')}<span>®</span></a><section class="auth-card glass-panel"><div class="auth-icon">${icon('lock')}</div><span class="small-label">PRIVATE CONTENT STUDIO</span><h1>Your corner<br>of the internet.</h1><p>Sign in to manage your portfolio. Your authenticator is the second key.</p>${message ? `<p class="form-error" role="alert">${esc(message)}</p>` : ''}${configured ? `<form id="admin-signin"><label>Email address<input type="email" name="email" autocomplete="username" required></label><label>Password<input type="password" name="password" autocomplete="current-password" required minlength="12"></label><p class="form-error" id="auth-error" role="alert"></p><button class="button button-primary" type="submit">Sign in securely ${icon('arrow')}</button></form><p class="auth-foot">Administrator access only. Password + authenticator.</p>` : `<div class="local-warning">Supabase isn’t connected yet. Explore the Studio locally; content and image uploads stay in this browser and do not change a live site. Secure sign-in becomes available after setup.</div><button id="preview-admin" class="button button-primary">Explore local Studio ${icon('arrow')}</button>`}<a href="/" data-link class="back-link">← Back to portfolio</a></section><span class="auth-decoration">✳</span></main>`;
+    root.innerHTML = `<main id="main" tabindex="-1" class="admin-auth"><a href="/" data-link class="brand">${esc(owner().brand || 'Nabin')}<span>®</span></a><section class="auth-card glass-panel"><div class="auth-icon">${icon('lock')}</div><span class="small-label">PRIVATE CONTENT STUDIO</span><h1>Your corner<br>of the internet.</h1><p>Sign in to manage your portfolio. Your authenticator is the second key.</p>${message ? `<p class="form-error" role="alert">${esc(message)}</p>` : ''}${configured ? `<form id="admin-signin"><label>Email address<input type="email" name="email" autocomplete="username" required></label><label>Password<input type="password" name="password" autocomplete="current-password" required></label><p class="form-error" id="auth-error" role="alert"></p><button class="button button-primary" type="submit">Sign in securely ${icon('arrow')}</button></form><p class="auth-foot">Administrator access only. Password + authenticator.</p>` : `<div class="local-warning">Supabase isn’t connected yet. Explore the Studio locally; content and image uploads stay in this browser and do not change a live site. Secure sign-in becomes available after setup.</div><button id="preview-admin" class="button button-primary">Explore local Studio ${icon('arrow')}</button>`}<a href="/" data-link class="back-link">← Back to portfolio</a></section><span class="auth-decoration">✳</span></main>`;
     document.title = `Private Studio — ${owner().name || 'Nabin'}`;
     root.querySelector('#preview-admin')?.addEventListener('click', () => { tab = 'overview'; shell(); });
     root.querySelector('#admin-signin')?.addEventListener('submit', async event => {
@@ -59,7 +59,13 @@ export async function mountAdmin(root, ctx) {
         const { data: member, error: memberError } = await supabase.from('admin_members').select('user_id').eq('user_id', user.id).maybeSingle();
         if (memberError || !member) { await supabase.auth.signOut({ scope: 'local' }); throw new Error('This account is not a portfolio administrator.'); }
         await mfa();
-      } catch (e) { if (!disposed && error.isConnected) { error.textContent = e.message; button.disabled = false; } }
+      } catch (e) {
+        if (disposed) return;
+        // SIGNED_OUT can replace this form while an authorization check fails.
+        // Keep the reason visible on the replacement form instead of losing it.
+        if (!error.isConnected) return login(e.message);
+        error.textContent = e.message; button.disabled = false;
+      }
     });
   }
 
