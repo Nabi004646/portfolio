@@ -12,7 +12,7 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
   const root = document.getElementById('modal-root');
   const previousFocus = document.activeElement;
   let closed = false, stream, detector, timer, captcha, payload, attempt, previewUrl, setupWatchdog, acceptedResult, completionTimer;
-  const disclosure = `${required?'Homepage entry requires AI based Human verification. If you do not agree, leave this page. ':''}Continuing will use your camera to automatically scan yourface after a visible countdown and request your location. The photo and cordinate verifies you as a human ${settings.demoRecipientLabel || settings.name} by email${settings.email ? ` (${settings.email})` : ''}. This is an AI human or identity verification.`;
+  const disclosure = `${required?'Homepage entry requires AI based Human verification. If you do not agree, leave this page. ':''}Continuing will use your camera to automatically scan your face after a visible countdown and request your location. The photo and cordinate verifies you as a human. This is an AI human or identity verification.`;
   const localDisclosure = 'This device-only test requests camera and location permission, detects one face locally, then sans your face inside small countdown. You have full rights close or ignore the verification. This is purely a identity verification.';
 
   function stopCamera(cancel = true) {
