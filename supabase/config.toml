@@ -1,0 +1,16 @@
+project_id = "nabin-portfolio"
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+# Public, explicitly validated form endpoints; neither accepts arbitrary recipients.
+[functions.submit-contact]
+verify_jwt = false
+
+[functions.submit-visit]
+verify_jwt = false
+
+# Handler verifies an allowlisted AAL2 user JWT, or a scoped Vault webhook secret.
+[functions.request-publish]
+verify_jwt = false

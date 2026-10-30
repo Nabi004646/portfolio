@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+.env.*
+!.env.example
+!/.env.production
+supabase/.env
+supabase/.temp/
+.DS_Store
+
+# Keep generated route HTML and secret files out of source control.
+functions/_generated/
+.npmrc
+supabase/secrets.production
+
+# MediaPipe WASM is copied from its pinned npm dependency during build.
+public/vision/wasm/

@@ -1,0 +1,31 @@
+{
+  "name": "nabin-portfolio",
+  "version": "2.3.1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "node scripts/preview-server.mjs",
+    "build": "node scripts/prepare-assets.mjs && vite build && node scripts/seo/generate.mjs && node scripts/seo/validate.mjs",
+    "preview": "node scripts/preview-server.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "seed:sql": "node scripts/generate-seed.mjs",
+    "dev:spa": "vite --host 0.0.0.0",
+    "check:seo": "node scripts/seo/validate.mjs",
+    "check:backend": "node scripts/check-backend.mjs"
+  },
+  "dependencies": {
+    "@fontsource-variable/dm-sans": "^5.3.0",
+    "@fontsource-variable/manrope": "^5.3.0",
+    "@mediapipe/tasks-vision": "0.10.35",
+    "@supabase/supabase-js": "2.118.0",
+    "markdown-it": "^14.3.3"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.13",
+    "sharp": "^0.35.5",
+    "vite": "8.3.5"
+  }
+}
