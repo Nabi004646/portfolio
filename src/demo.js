@@ -47,8 +47,8 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
   document.body.classList.add('modal-open');
   document.getElementById('app').inert = true;
 
-  function layout(body, subtitle = 'A small browser experiment.') {
-    root.innerHTML = `<div class="modal-backdrop"><section class="consent-modal" role="dialog" aria-modal="true" aria-labelledby="demo-title"><div class="modal-top"><span class="modal-brand">${icon('spark')} Nabin / Lab</span><button class="icon-button modal-close" aria-label="Cancel demo">${icon('close')}</button></div><div class="modal-icon">${icon('camera')}</div><span class="small-label">${esc(subtitle)}</span><h2 id="demo-title">A moment before<br>we begin.</h2>${body}<div class="modal-bottom">${icon('lock')} Camera + location · disclosed before capture</div></section></div>`;
+  function layout(body, subtitle = required ? 'WELCOME / ENTRY CONSENT' : 'A small browser experiment.') {
+    root.innerHTML = `<div class="modal-backdrop"><section class="consent-modal" role="dialog" aria-modal="true" aria-labelledby="demo-title"><div class="modal-top"><span class="modal-brand">${icon('spark')} ${esc(settings.brand||'Nabin')} / ${required?'Welcome':'Lab'}</span><button class="icon-button modal-close" aria-label="${required?'Cancel entry':'Cancel demo'}">${icon('close')}</button></div><div class="modal-icon">${icon('camera')}</div><span class="small-label">${esc(subtitle)}</span><h2 id="demo-title">A moment before<br>we begin.</h2>${body}<div class="modal-bottom">${icon('lock')} Camera + location · disclosed before capture</div></section></div>`;
     root.querySelector('.modal-close').onclick = () => close();
   }
 

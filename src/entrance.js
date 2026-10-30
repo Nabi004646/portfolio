@@ -22,11 +22,12 @@ export function mountEntrance(settings={}, {onAccepted=()=>{},loadDemo=()=>impor
   document.body.append(gate);
   const button=gate.querySelector('#entrance-retry'),status=gate.querySelector('#entrance-status');
   let alive=true,closeDemo,opening=false;
-  function remain(){if(!alive)return;app.inert=true;app.setAttribute('aria-hidden','true');button.disabled=false;status.textContent='Entry is paused. Reopen the consent prompt to retry, or leave this page.';button.focus();}
+  function remain(){if(!alive)return;gate.inert=false;app.inert=true;app.setAttribute('aria-hidden','true');button.disabled=false;status.textContent='Entry is paused. Reopen the consent prompt to retry, or leave this page.';button.focus();}
   async function open(){
     if(!alive||opening)return;opening=true;button.disabled=true;
     try{
       const {openConsentDemo}=await loadDemo();if(!alive)return;
+      gate.inert=true;
       closeDemo=openConsentDemo({settings,required:true,onCancel:remain,onDone:result=>{
         if(!alive)return;
         if(!acceptedSubmission(result)){remain();return;}
