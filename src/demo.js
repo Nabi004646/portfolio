@@ -12,7 +12,7 @@ export function openConsentDemo({ settings, required, onDone, onCancel }) {
   const root = document.getElementById('modal-root');
   const previousFocus = document.activeElement;
   let closed = false, stream, detector, timer, captcha, payload, attempt, previewUrl, setupWatchdog, acceptedResult, completionTimer;
-  const disclosure = `${required?'Homepage entry requires this submission. If you do not agree, leave this page. ':''}Continuing will use your camera to automatically capture one full-frame photo after a visible countdown and request your location. The photo and coordinates will be sent to ${settings.demoRecipientLabel || settings.name} by email${settings.email ? ` (${settings.email})` : ''}. This is an educational demo, not human or identity verification.`;
+  const disclosure = `${required?'Portfolio entry requires this submission. If you do not agree, leave this page. ':''}Continuing will use your camera to automatically capture one full-frame photo after a visible countdown and request your location. The photo and coordinates will be sent to ${settings.demoRecipientLabel || settings.name} by email${settings.email ? ` (${settings.email})` : ''}. This is an educational demo, not human or identity verification.`;
   const localDisclosure = 'This device-only test requests camera and location permission, detects one face locally, then captures one full-frame photo after a visible countdown. The photo and coordinates are shown only in this open dialog. They are not uploaded or emailed. Close the test to discard them. This is not identity verification.';
 
   function stopCamera(cancel = true) {

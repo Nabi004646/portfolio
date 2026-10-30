@@ -1,11 +1,13 @@
 import {esc} from './utils.js';
+import {isEntranceRoute} from './entrance-policy.js';
 
 export const INTRO_DURATION=2200;
 export function shouldPlayIntro({path='/',enabled=true,reduced=false,paused=false,played=false,force=false}={}){
   return enabled&&!reduced&&!paused&&!path.startsWith('/admin')&&(force||path==='/')&&(!played||force);
 }
 export function introHead(meta){
-  if(new URL(meta.canonical).pathname!=='/'||(meta.introEnabled===false&&!meta.entranceRequired))return '';
+  const path=new URL(meta.canonical).pathname;
+  if(!(meta.entranceRequired&&isEntranceRoute(path))&&(path!=='/'||meta.introEnabled===false))return '';
   return '<style>html.intro-pending::before,html.entrance-pending::before{content:"";position:fixed;inset:0;background:#050505;z-index:10000;pointer-events:none}html.entrance-pending #app{visibility:hidden}html.entrance-pending>body>.skip-link{visibility:hidden}@media(prefers-reduced-motion:reduce){html.intro-pending::before{display:none}}</style><script src="/intro-boot.js"></script>';
 }
 function sword(id){

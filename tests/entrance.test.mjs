@@ -5,25 +5,30 @@ import vm from 'node:vm';
 import {ENTRANCE_KEY,acceptedSubmission,requiresEntrance,mountEntrance} from '../src/entrance.js';
 
 const reference='33333333-3333-4333-8333-333333333333';
-test('homepage entrance requires an accepted submission reference and excludes admin, legal and article routes',()=>{
+test('all public portfolio routes require entrance, with legal and admin exceptions',()=>{
   assert.equal(requiresEntrance({required:true}),true);
-  for(const path of ['/admin/','/privacy/','/terms/','/blog/article/','/lab/'])assert.equal(requiresEntrance({path,required:true}),false);
+  for(const path of ['/blog','/blog/','/blog/article/','/blog/page/2/','/blog/category/linux/','/blog/tag/android/','/blog/search/','/projects/','/projects/demo/','/about/','/contact/','/certificates/','/author/nabin-kunwar/']){
+    assert.equal(requiresEntrance({path,required:true}),true,path);
+    assert.equal(requiresEntrance({path,required:true,reference}),false,path);
+    assert.equal(requiresEntrance({path,required:true,reference:'forged-text'}),true,path);
+  }
+  for(const path of ['/admin','/admin/','/admin/login/','/privacy','/privacy/','/terms/','/lab/','/404.html','/410.html'])assert.equal(requiresEntrance({path,required:true}),false,path);
   assert.equal(requiresEntrance({required:false}),false);
   assert.equal(requiresEntrance({required:true,reference}),false);
   for(const result of [undefined,{status:'accepted',id:'local-test'},{status:'failed',id:reference}])assert.equal(acceptedSubmission(result),false);
   assert.equal(acceptedSubmission({status:'accepted',id:reference}),true);
 });
 
-test('cancelled and failed entrance submissions never reveal the homepage or start the intro',async()=>{
+test('cancelled and failed direct blog entrance never reveals content or starts the intro',async()=>{
   const saved=Object.fromEntries(['document','location','sessionStorage'].map(key=>[key,globalThis[key]]));
   const values=new Map(),classes=new Set();let accepted=0,callbacks,removed=false;
   const attrs=new Map(),app={inert:false,setAttribute:(k,v)=>attrs.set(k,v),removeAttribute:k=>attrs.delete(k)};
   const button={disabled:false,focus(){this.focused=true;}},status={textContent:''};
   const gate={setAttribute(){},querySelector:selector=>selector==='#entrance-retry'?button:status,remove(){removed=true;}};
   try{
-    globalThis.location={pathname:'/'};
+    globalThis.location={pathname:'/blog/'};
     globalThis.sessionStorage={getItem:key=>values.get(key)||null,setItem:(key,value)=>values.set(key,value)};
-    globalThis.document={documentElement:{classList:{add:x=>classes.add(x),remove:x=>classes.delete(x)}},getElementById:()=>app,createElement:()=>gate,body:{append(){}}};
+    globalThis.document={documentElement:{dataset:{entrance:'required'},classList:{add:x=>classes.add(x),remove:x=>classes.delete(x)}},getElementById:()=>app,createElement:()=>gate,body:{append(){}}};
     const control=mountEntrance({entranceRequired:true,name:'Owner',email:'owner@example.com'},{onAccepted:()=>accepted++,loadDemo:async()=>({openConsentDemo:options=>{callbacks=options;return ()=>{};}})});
     await new Promise(resolve=>setImmediate(resolve));
     assert.equal(control.required,true);assert.equal(callbacks.required,true);
@@ -39,8 +44,11 @@ test('cancelled and failed entrance submissions never reveal the homepage or sta
 });
 
 test('the entrance paint guard holds before animation even with reduced motion and an already-seen intro',async()=>{
-  const source=await readFile('public/intro-boot.js','utf8'),classes=new Set();
-  const root={dataset:{entrance:'required'},classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)}};
-  vm.runInNewContext(source,{document:{documentElement:root},location:{pathname:'/',search:''},sessionStorage:{getItem:key=>key===ENTRANCE_KEY?null:'1'},localStorage:{getItem:()=>null},matchMedia:()=>({matches:true}),URLSearchParams,setTimeout:()=>{throw new Error('The animation fallback must not unlock a pending entrance');}});
-  assert.equal(classes.has('entrance-pending'),true);assert.equal(classes.has('intro-pending'),false);
+  const source=await readFile('public/intro-boot.js','utf8');
+  for(const path of ['/','/blog','/blog/','/blog/article/','/projects/'])for(const stored of ['', 'invalid', reference, 'blocked']){
+    const classes=new Set();
+    const root={dataset:{entrance:'required'},classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)}};
+    vm.runInNewContext(source,{document:{documentElement:root},location:{pathname:path,search:''},sessionStorage:{getItem:key=>{if(stored==='blocked')throw new Error('Storage blocked');return key===ENTRANCE_KEY?stored:'1';}},localStorage:{getItem:()=>null},matchMedia:()=>({matches:true}),URLSearchParams,setTimeout:()=>{throw new Error('The animation fallback must not unlock a pending entrance');}});
+    assert.equal(classes.has('entrance-pending'),stored!==reference,`${path} (${stored})`);assert.equal(classes.has('intro-pending'),false);
+  }
 });

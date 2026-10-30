@@ -29,10 +29,17 @@ test('the static build exports full article HTML, real image dimensions, crawlab
   try {
     await cp('dist',outDir,{recursive:true});await mkdir(publicDir);
     await sharp({create:{width:1500,height:800,channels:3,background:'#3156eb'}}).png().toFile(path.join(publicDir,'test-featured.png'));
-    const source=seoFixture();const result=await generateSite({...source,outDir,publicDir,functionDir,origin:'https://portfolio.test',indexable:true});
+    const source=seoFixture();source.items.find(item=>item.id==='settings').data.entranceRequired=true;
+    const result=await generateSite({...source,outDir,publicDir,functionDir,origin:'https://portfolio.test',indexable:true});
     const report=await validateBuild(outDir,functionDir);assert.equal(report.passed,true);assert.equal(report.publishedArticles,8);
     const html=await readFile(path.join(outDir,'blog/fixture-note-1/index.html'),'utf8');
     assert.match(html,/<title>Fixture SEO title 1<\/title>/);
+    for(const route of ['','blog/','blog/fixture-note-1/','blog/page/2/','blog/category/linux/','about/','projects/']){
+      const document=await readFile(path.join(outDir,route,'index.html'),'utf8');
+      assert.match(document,/data-entrance="required"/,route);assert.match(document,/<script src="\/intro-boot.js"><\/script>/,route);
+      assert.match(document,/html.entrance-pending #app\{visibility:hidden\}/,route);
+    }
+    for(const route of ['admin/index.html','privacy/index.html','lab/index.html','404.html','410.html'])assert.match(await readFile(path.join(outDir,route),'utf8'),/data-entrance="off"/,route);
     assert.match(html,/<link rel="canonical" href="https:\/\/portfolio.test\/blog\/fixture-note-1\/"/);
     assert.match(html,/This is a synthetic question and answer/);assert.match(html,/aria-label="On this page"/);
     assert.equal((html.match(/<h1(?:\s[^>]*)?>/g)||[]).length,1);

@@ -92,8 +92,8 @@ Profile photos, real certificates, résumé, project screenshots and original ar
 3. Create and confirm the admin Auth user privately, then run authorize-nabin.sql and enroll TOTP.
 4. Configure the custom domain and deployment hook, install the Vault publishing trigger once, and verify live delivery/publishing.
 
-## Homepage entrance update
+## Portfolio entrance update
 
-The published settings now enable `entranceRequired`. On the first homepage visit in a tab, a disclosed Agree & Start flow appears before the katana animation. There is no Skip control for entry. Cancellation or failure keeps the homepage covered with a retry prompt. Only an accepted submission response opens the homepage and starts the animation; this records email-service acceptance, not inbox delivery. Privacy, admin, articles and the independent Lab remain reachable. This browser presentation flow does not protect downloadable public assets or verify identity.
+The published settings now enable `entranceRequired`. On the first public portfolio page visit in a tab (including `/blog/`, article URLs, category and paginated archives), a disclosed Agree & Start flow appears before the katana animation. There is no Skip control for entry. Cancellation or failure keeps the current page covered with a retry prompt. Only an accepted submission response opens the requested page and starts the animation; this records email-service acceptance, not inbox delivery. Privacy, terms, admin, error pages and the independent Lab remain reachable. An accepted reference is reused for navigation in the same tab; opening `/blog` redirects to `/blog/` and shows the same entrance when no reference exists. This browser presentation flow does not protect downloadable public assets or verify identity.
 
 The submission backend was returning 503 because `IP_HASH_SECRET` was absent, too short or a placeholder. Set a private random value in Supabase Edge Function Secrets before testing delivery. Administrator membership for the confirmed owner account is now installed; the owner still enrolls and completes TOTP privately.
