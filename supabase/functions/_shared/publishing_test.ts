@@ -4,14 +4,17 @@ const secret='test-only-scoped-webhook-secret-1234567890';
 const hook='https://api.cloudflare.com/client/v4/pages/webhooks/deploy_hooks/test-only-hook';
 const admin='11111111-1111-4111-8111-111111111111';
 const assert=(condition:unknown,message='Assertion failed')=>{if(!condition)throw new Error(message);};
-function setup(options:{aal?:string,member?:boolean,count?:number,accepted?:boolean,hook?:string}={}) {
+function setup(options:{aal?:string,member?:boolean,count?:number,accepted?:boolean,hook?:string,vaultHook?:string,vaultSecret?:string}={}) {
   Deno.env.set('ALLOWED_ORIGINS','https://portfolio.test');
   const calls:{name:string,args?:unknown}[]=[];let requests=0;
   const client={auth:{
     getClaims:async()=>({data:{claims:{sub:admin,aal:options.aal||'aal2'}},error:null}),
     getUser:async()=>({data:{user:{id:admin}},error:null}),
-  },from:()=>({select:()=>({eq:()=>({maybeSingle:async()=>({data:options.member===false?null:{user_id:admin},error:null})})})}),
-  rpc:async(name:string,args?:unknown)=>{calls.push({name,args});return {data:name==='claim_publish_batch'?{batch_id:'test-batch',count:options.count??1}:null,error:null};}
+  },from:()=>({
+    select:()=>({eq:()=>({maybeSingle:async()=>({data:options.member===false?null:{user_id:admin},error:null})})}),
+    update:(args:unknown)=>({eq:async()=>{calls.push({name:'status',args});return {error:null};}}),
+  }),
+  rpc:async(name:string,args?:unknown)=>{if(name==='get_portfolio_publish_config')return {data:{deploy_hook:options.vaultHook,webhook_secret:options.vaultSecret},error:null};calls.push({name,args});return {data:name==='claim_publish_batch'?{batch_id:'test-batch',count:options.count??1}:null,error:null};}
   } as unknown as ReturnType<typeof db>;
   const getEnv=(name:string)=>({PUBLISH_WEBHOOK_SECRET:secret,CLOUDFLARE_DEPLOY_HOOK:options.hook??hook}[name]||'');
   const fetcher=(async(input:RequestInfo|URL,init?:RequestInit)=>{assert(String(input)===hook);assert(init?.method==='POST');requests++;return new Response('{}',{status:options.accepted===false?500:200});}) as typeof fetch;
@@ -43,6 +46,16 @@ Deno.test('provider failure stays retryable and misconfigured destinations never
   assert(response.status===502&&text.includes('content is saved')&&!text.includes(hook));
   assert(JSON.stringify(deps.calls[1].args).includes('"p_success":false'));
   for(const bad of ['https://evil.test/hook','http://api.cloudflare.com/client/v4/pages/webhooks/deploy_hooks/foo','https://api.cloudflare.com/other']){
-    const deps=setup({hook:bad});const response=await publishingHandler(deps.browser(),deps);assert(response.status===503&&deps.requests===0&&deps.calls.length===0);
+    const deps=setup({hook:bad});const response=await publishingHandler(deps.browser(),deps);assert(response.status===503&&deps.requests===0&&deps.calls[0].name==='status');
+    assert((await response.json()).code==='publishing_not_configured');
+  }
+});
+Deno.test('owner-configured Vault connection works for authenticated saves and automatic webhooks',async()=>{
+  for(const webhook of [false,true]){
+    const vaultSecret='private-test-only-vault-webhook-token-1234567890';
+    const deps=setup({hook:'',vaultHook:hook,vaultSecret});
+    const request=webhook?new Request('https://backend.test',{method:'POST',headers:{'x-publish-secret':vaultSecret}}):deps.browser();
+    const response=await publishingHandler(request,deps);const text=await response.text();
+    assert(response.status===200&&deps.requests===1);assert(!text.includes(hook)&&!text.includes(vaultSecret));
   }
 });

@@ -14,8 +14,11 @@ export async function publishingHandler(request:Request,deps:{client?:ReturnType
     if(request.method!=='POST')throw new HttpError(405,'Use POST.');
     if(Number(request.headers.get('content-length')||'0')>4096)throw new HttpError(413,'The request is too large.');
     const client=deps.client||db();
+    let stored:{deploy_hook?:string;webhook_secret?:string}={};
+    const loadStored=async()=>{const {data,error}=await client.rpc('get_portfolio_publish_config');if(!error&&data)stored=data;};
     const shared=request.headers.get('x-publish-secret')||'';
-    const isWebhook=!hasOrigin&&equalSecret(shared,getEnv('PUBLISH_WEBHOOK_SECRET'));
+    if(!hasOrigin&&shared.length>=32)await loadStored();
+    const isWebhook=!hasOrigin&&(equalSecret(shared,getEnv('PUBLISH_WEBHOOK_SECRET'))||equalSecret(shared,stored.webhook_secret||''));
     if(!isWebhook){
       if(!hasOrigin)throw new HttpError(401,'Authentication is required.');
       const token=request.headers.get('authorization')?.match(/^Bearer (.+)$/i)?.[1];if(!token)throw new HttpError(401,'Authentication is required.');
@@ -25,10 +28,14 @@ export async function publishingHandler(request:Request,deps:{client?:ReturnType
       if(userError||user?.user?.id!==verified.claims.sub)throw new HttpError(403,'Your sign-in session could not be verified.');
       const {data:membership,error:memberError}=await client.from('admin_members').select('user_id').eq('user_id',verified.claims.sub).maybeSingle();
       if(memberError||!membership)throw new HttpError(403,'Administrator access is required.');
+      await loadStored();
     }
-    const rawHook=getEnv('CLOUDFLARE_DEPLOY_HOOK');let hook:URL;
+    const rawHook=stored.deploy_hook||getEnv('CLOUDFLARE_DEPLOY_HOOK');let hook:URL;
     try{hook=new URL(rawHook);if(hook.protocol!=='https:'||hook.hostname!=='api.cloudflare.com'||!hook.pathname.startsWith('/client/v4/pages/webhooks/deploy_hooks/')||hook.username||hook.password)throw new Error();}
-    catch{throw new HttpError(503,'The server-side Cloudflare deploy hook is not configured.');}
+    catch{
+      await client.from('publishing_status').update({state:'not_configured',last_error:'Cloudflare is not connected. Open Studio → Publishing and connect your production deploy hook.'}).eq('id',1);
+      return json({ok:false,code:'publishing_not_configured',error:'Cloudflare is not connected. Open Studio → Publishing and connect your production deploy hook.'},503,headers);
+    }
     const {data:batch,error:claimError}=await client.rpc('claim_publish_batch');
     if(claimError||!batch)throw new HttpError(503,'The publishing queue is unavailable.');
     if(!batch.count)return json({ok:true,state:'no_pending_changes',count:0},200,headers);

@@ -47,10 +47,21 @@ export async function loadContent(admin = false) {
   return editorFields(data);
 }
 
+export async function configurePublishing(deployHook){
+  if(!configured)throw new Error('Connect Supabase before setting up publishing.');
+  const {error}=await supabase.rpc('configure_portfolio_publishing',{p_deploy_hook:deployHook.trim(),p_function_url:`${url.replace(/\/$/,'')}/functions/v1/request-publish`});
+  if(error?.code==='PGRST202')throw new Error('The publishing-connection migration still needs installation. As an alternative, set CLOUDFLARE_DEPLOY_HOOK privately in Supabase Edge Function Secrets, then request a build here.');
+  if(error)throw new Error('Publishing could not be connected. Verify your second factor and use the Cloudflare Pages production deploy hook URL.');
+}
 export async function requestPublishing(){
   if(!configured){publishingNotice='Saved in this browser. Export public content from Studio and rebuild to preview generated HTML; nothing was deployed.';return;}
-  const {data,error}=await supabase.functions.invoke('request-publish',{body:{action:'dispatch'}});
-  publishingNotice=error||!data?.ok?'Content saved. Publishing needs attention; use Publishing to check setup and retry.':data.state==='requested'?'Content saved and build requested. Check Cloudflare for deployment success.':'Content saved. No pending public changes.';
+  const {publishingFeedback}=await import('./publishing-feedback.js');
+  try{
+    const {data,error}=await supabase.functions.invoke('request-publish',{body:{action:'dispatch'}});
+    let detail=data;
+    if(error?.context instanceof Response)detail=await error.context.clone().json().catch(()=>null);
+    publishingNotice=publishingFeedback(detail,{status:error?.context?.status||0,failed:Boolean(error)});
+  }catch{publishingNotice=publishingFeedback(null,{failed:true});}
 }
 
 export async function saveContent(record, items) {

@@ -63,14 +63,20 @@ The public defaults are in `.env.production`; dashboard variables override them.
 
 Add the custom domain in this existing Pages project's Custom domains settings. Configure an account-level redirect from `portfolio-17x.pages.dev` and any chosen www alias to `https://nabikunwar.com.np`, preserving paths and queries. Those DNS/host settings are account operations, not already completed by this source change.
 
-## 5. Automatic article publishing
+## 5. Automatic portfolio and article publishing
 
-Create a deploy hook on the Pages production branch; store the URL privately as `CLOUDFLARE_DEPLOY_HOOK`. Set `PUBLISH_WEBHOOK_SECRET` independently of all API keys. In Supabase Vault, add:
+The publishing-connection migration installs the private queue webhook. After signing into Studio with your authenticator, open **Publishing** and expand **Connect or replace the Cloudflare publishing connection**.
 
-- `portfolio_publish_url`: `https://xgtqpixoutlhqhflkpqs.supabase.co/functions/v1/request-publish`
-- `portfolio_publish_secret`: the same private value as `PUBLISH_WEBHOOK_SECRET`.
+1. In Cloudflare, open Workers & Pages → portfolio → Settings → Builds & deployments → Deploy hooks.
+2. Create a deploy hook for the production branch (`main`).
+3. Paste that private URL into the Studio connection form and choose **Connect & publish saved changes**.
+4. Wait for the Cloudflare deployment to finish, then refresh the public page. The save/build request message is not proof of a completed deployment.
 
-Then run `supabase/setup/publishing-webhook.sql` once after checking that its trigger does not already exist. Studio publishing changes then enter the queue and request a Pages rebuild. Check the finished Pages deployment: a successful hook request alone is not deployment success.
+The form stores the hook, function URL and an automatically generated, narrowly scoped webhook secret in Supabase Vault. Only allowlisted AAL2 administrators can configure it. Only the server role can retrieve the credentials. Public exports contain no connection settings. The Edge Function prefers this Vault connection; existing environment-only deploy hooks still work as a fallback. Do not paste the deploy hook into GitHub, this document, or a chat message.
+
+Every saved public-content change enters the queue and notifies the signed publishing function, including changes made outside Studio. Studio also requests dispatch after its own saves. Requests claim a queue batch, so simultaneous duplicate notifications do not publish the same batch twice. Failed requests retain the saved changes for retry. Changes queued before setup are requested when the connection form is submitted. A failed webhook transport can be retried from Publishing; there is no claim that hook acceptance proves deployment success.
+
+For existing installations using `supabase/setup/publishing-webhook.sql`, the new migration replaces the trigger safely; do not install a second trigger. `supabase/setup/publishing-connection.sql` mirrors the migration for review.
 
 ## 6. Acceptance checks before launch
 
@@ -90,7 +96,7 @@ Profile photos, real certificates, résumé, project screenshots and original ar
 1. Connect Cloudflare Pages project portfolio to this repository, using main, build command npm run build and output directory dist.
 2. Set the Supabase Edge Function Secrets shown above, including ALLOWED_ORIGINS and TURNSTILE_HOSTNAMES. Complete the remaining private values without putting them into Git.
 3. Create and confirm the admin Auth user privately, then run authorize-nabin.sql and enroll TOTP.
-4. Configure the custom domain and deployment hook, install the Vault publishing trigger once, and verify live delivery/publishing.
+4. Configure the custom domain, connect the production deploy hook privately in Studio → Publishing, and verify live delivery/publishing.
 
 ## Portfolio entrance update
 
